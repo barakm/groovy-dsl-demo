@@ -1,0 +1,295 @@
+import groovy.util.ConfigObject;
+import groovy.util.ConfigSlurper;
+
+import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.Parameter;
+
+class PropertiesRecord {
+	ConfigObject properties
+	long lastModified
+	String propFileName
+}
+
+Map<String, PropertiesRecord> loadedPropertyFiles = new LinkedHashMap<String, PropertiesRecord>();
+ 
+PropertiesRecord lastrec = null
+
+registerPointcut("dslFile", {
+	//log "Current element is of type: " + it.class
+	if(it instanceof ClassNode){
+		//log "Current element is a class node"
+		def ctx =  it.module.context
+		if (ctx!= null) {
+			String name = ctx.name
+		//	log "This is the name: " + name
+			
+			
+			PropertiesRecord rec = loadedPropertyFiles.get(name)
+			if(rec != null) {
+				lastrec = rec
+				if(rec.properties == null) {
+					return [:] // no properties for this file
+				} else {
+					if(System.currentTimeMillis() < rec.lastModified + 5000) {
+						// file was read recently - don't bother now.
+						return [:]
+					}
+				}
+			}
+
+			// 				 
+			int index = name.lastIndexOf(".")
+			String propFilePath = name.substring(0, index) + ".properties"			
+		//	log "Props path is: " + propFilePath
+			File propsFile = new File(propFilePath);
+			if(!propsFile.exists()) {
+				PropertiesRecord newrec = new PropertiesRecord()
+				loadedPropertyFiles.put(name, newrec)
+				lastrec = newrec
+			} else {
+			//	log "Found properties file: " + propsFile
+				
+				if(rec == null) {
+					rec = new PropertiesRecord()
+					rec.lastModified = propsFile.lastModified()
+					rec.properties =  new ConfigSlurper().parse(propsFile.toURI().toURL());
+					rec.propFileName = propFilePath
+					loadedPropertyFiles.put(name, rec);
+					lastrec = rec
+				} else {
+					// load prop file only if modified since last read
+					if(propsFile.lastModified() > rec.lastModified) {
+						
+						rec.lastModified = propsFile.lastModified()
+						rec.properties =  new ConfigSlurper().parse(propsFile.toURI().toURL());
+					} 
+					lastrec = rec
+					
+				}
+			}
+		}
+	}
+	return [:]
+})
+
+
+(not(enclosingClosure()) & isThisType()).accept {
+	method name:'service', params:[arg1:Closure], provider :'Cloudify DSL', doc: 'Service recipe root node'
+	method name:'application', params:[arg1:Closure], provider :'Cloudify DSL', doc: 'Application recipe root node'
+	method name:'cloud', params:[arg1:Closure], provider :'Cloudify DSL', doc: 'Cloud configuration root node'
+}
+
+(isThisType() & dslFile()).accept {
+	property name:'context', type:'org.cloudifysource.dsl.context.ServiceContext', doc: 'This is a test thing'
+	log "Checking for properties"
+	if(lastrec != null) {
+		log "Found rec: " + lastrec
+		if(lastrec.properties != null) {
+			//log "properties are not null: " + lastrec.properties
+			//log "Keys: " + lastrec.properties.keySet()
+			lastrec.properties.keySet().each {
+				//log "Adding " + it
+				property name:it, type:String, doc: "Property loaded from file: " + lastrec.propFileName
+			}
+		}
+	}
+	
+ 
+}
+(enclosingCall(name("barLineChart"))).accept {
+	method (name:'axisYUnit', params:[arg1:'org.openspaces.ui.Unit'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("network"))).accept {
+	method (name:'port', params:[arg1:'int'], provider:'Cloudify DSL', doc: 'Port number opened by this service.')
+	method (name:'protocolDescription', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("plugin"))).accept {
+	method (name:'className', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+	method (name:'config', params:[arg1:'java.util.Map'], provider:'Cloudify DSL', doc: '')
+	method (name:'name', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("userInterface")) & not(enclosingCall(name("metricGroup"))) & not(enclosingCall(name("widgetGroup")))).accept {
+	method (name:'metricGroups', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+	method (name:'widgetGroups', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("metricGroup"))).accept {
+	method (name:'name', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+	method (name:'metrics', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("memcached"))).accept {
+	method (name:'port', params:[arg1:'java.lang.Integer'], provider:'Cloudify DSL', doc: '')
+	method (name:'portRetries', params:[arg1:'java.lang.Integer'], provider:'Cloudify DSL', doc: '')
+	method (name:'threaded', params:[arg1:'boolean'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'binaries', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("dedicated"))).accept {
+}
+(enclosingCall(name("lifecycle"))).accept {
+	method (name:'init', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'preInstall', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'install', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'postInstall', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'preStart', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'start', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'postStart', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'preStop', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'stop', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'postStop', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'shutdown', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'preServiceStart', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'preServiceStop', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'startDetection', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'monitors', params:[arg1:'java.lang.Object'], provider:'Cloudify DSL', doc: '')
+	method (name:'details', params:[arg1:'java.lang.Object'], provider:'Cloudify DSL', doc: '')
+	method (name:'locator', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'stopDetection', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableDSLEntry'], provider:'Cloudify DSL', doc: '')
+	method (name:'startDetectionTimeoutSecs', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+	method (name:'startDetectionIntervalSecs', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("scalingRule")) & not(enclosingCall(name("highThreshold"))) & not(enclosingCall(name("lowThreshold")))).accept {
+	method (name:'serviceStatistics', params:[arg1:'java.lang.Object'], provider:'Cloudify DSL', doc: '')
+	method (name:'highThreshold', params:[arg1:'org.cloudifysource.dsl.scalingrules.HighThresholdDetails'], provider:'Cloudify DSL', doc: '')
+	method (name:'lowThreshold', params:[arg1:'org.cloudifysource.dsl.scalingrules.LowThresholdDetails'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("statelessProcessingUnit"))).accept {
+	method (name:'binaries', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'can be a folder, or a jar/war file.')
+}
+(enclosingCall(name("isolationSLA")) & not(enclosingCall(name("dedicated"))) & not(enclosingCall(name("global")))).accept {
+	method (name:'global', params:[arg1:'org.cloudifysource.dsl.GlobalIsolationSLADescriptor'], provider:'Cloudify DSL', doc: '')
+	method (name:'dedicated', params:[arg1:'org.cloudifysource.dsl.DedicatedIsolationSLADescriptor'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("compute"))).accept {
+	method (name:'template', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("sla"))).accept {
+	method (name:'memoryCapacity', params:[arg1:'java.lang.Integer'], provider:'Cloudify DSL', doc: '')
+	method (name:'maxMemoryCapacity', params:[arg1:'java.lang.Integer'], provider:'Cloudify DSL', doc: 'Processing unit\'s maximum memory capacity.')
+	method (name:'highlyAvailable', params:[arg1:'boolean'], provider:'Cloudify DSL', doc: 'Defines whether to create a backup for the Processing unit.')
+	method (name:'memoryCapacityPerContainer', params:[arg1:'java.lang.Integer'], provider:'Cloudify DSL', doc: 'Memory capacity definition for GSC.')
+}
+(enclosingCall(name("template"))).accept {
+	method (name:'imageId', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'machineMemoryMB', params:[arg1:'int'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'hardwareId', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'locationId', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'localDirectory', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'keyFile', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'numberOfCores', params:[arg1:'int'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'options', params:[arg1:'java.util.Map'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'overrides', params:[arg1:'java.util.Map'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'custom', params:[arg1:'java.util.Map'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'fileTransfer', params:[arg1:'org.cloudifysource.dsl.cloud.FileTransferModes'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'remoteExecution', params:[arg1:'org.cloudifysource.dsl.cloud.RemoteExecutionModes'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'username', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'password', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'remoteDirectory', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'privileged', params:[arg1:'boolean'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'initializationCommand', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'javaUrl', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'absoluteUploadDir', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'env', params:[arg1:'java.util.Map'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+}
+(enclosingCall(name("widgetGroup")) & not(enclosingCall(name("barLineChart"))) & not(enclosingCall(name("balanceGauge")))).accept {
+	method (name:'name', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+	method (name:'title', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+	method (name:'widgets', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("statefulProcessingUnit"))).accept {
+	method (name:'binaries', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'can be a folder, or a jar/war file.')
+}
+(enclosingCall(name("application")) & not(enclosingCall(name("service")))).accept {
+	method (name:'name', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+	method (name:'services', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("highThreshold"))).accept {
+	method (name:'value', params:[arg1:'java.lang.Comparable'], provider:'Cloudify DSL', doc: '')
+	method (name:'instancesIncrease', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("global"))).accept {
+	method (name:'instanceMemoryMB', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+	method (name:'instanceCpuCores', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("provider"))).accept {
+	method (name:'provider', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'cloudifyUrl', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'cloudifyOverridesUrl', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'machineNamePrefix', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'dedicatedManagementMachines', params:[arg1:'boolean'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'managementOnlyFiles', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'sshLoggingLevel', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'zones', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'managementGroup', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'numberOfManagementMachines', params:[arg1:'int'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'reservedMemoryCapacityPerMachineInMB', params:[arg1:'int'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+}
+(enclosingCall(name("serviceStatistics"))).accept {
+}
+(enclosingCall(name("lowThreshold"))).accept {
+	method (name:'value', params:[arg1:'java.lang.Comparable'], provider:'Cloudify DSL', doc: '')
+	method (name:'instancesDecrease', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+}
+(enclosingCall(name("perInstanceStatistics"))).accept {
+}
+(enclosingCall(name("mirrorProcessingUnit"))).accept {
+}
+(enclosingCall(name("dataGrid"))).accept {
+}
+(enclosingCall(name("balanceGauge"))).accept {
+}
+(enclosingCall(name("service")) & not(enclosingCall(name("network"))) & not(enclosingCall(name("plugin"))) & not(enclosingCall(name("userInterface"))) & not(enclosingCall(name("memcached"))) & not(enclosingCall(name("lifecycle"))) & not(enclosingCall(name("scalingRule"))) & not(enclosingCall(name("statelessProcessingUnit"))) & not(enclosingCall(name("isolationSLA"))) & not(enclosingCall(name("compute"))) & not(enclosingCall(name("statefulProcessingUnit"))) & not(enclosingCall(name("perInstanceStatistics"))) & not(enclosingCall(name("mirrorProcessingUnit"))) & not(enclosingCall(name("dataGrid")))).accept {
+	method (name:'name', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+	method (name:'icon', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+	method (name:'isolationSLA', params:[arg1:'org.cloudifysource.dsl.IsolationSLA'], provider:'Cloudify DSL', doc: '')
+	method (name:'lifecycle', params:[arg1:'org.cloudifysource.dsl.ServiceLifecycle'], provider:'Cloudify DSL', doc: '')
+	method (name:'userInterface', params:[arg1:'org.openspaces.ui.UserInterface'], provider:'Cloudify DSL', doc: '')
+	method (name:'plugins', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+	method (name:'dependsOn', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+	method (name:'network', params:[arg1:'org.cloudifysource.dsl.ServiceNetwork'], provider:'Cloudify DSL', doc: '')
+	method (name:'numInstances', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+	method (name:'minAllowedInstances', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+	method (name:'maxAllowedInstances', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+	method (name:'minAllowedInstancesPerLocation', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+	method (name:'maxAllowedInstancesPerLocation', params:[arg1:'int'], provider:'Cloudify DSL', doc: '')
+	method (name:'maxJarSize', params:[arg1:'long'], provider:'Cloudify DSL', doc: '')
+	method (name:'customCommands', params:[arg1:'org.cloudifysource.dsl.entry.ExecutableEntriesMap'], provider:'Cloudify DSL', doc: '')
+	method (name:'type', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+	method (name:'statelessProcessingUnit', params:[arg1:'org.cloudifysource.dsl.StatelessProcessingUnit'], provider:'Cloudify DSL', doc: '')
+	method (name:'statefulProcessingUnit', params:[arg1:'org.cloudifysource.dsl.StatefulProcessingUnit'], provider:'Cloudify DSL', doc: '')
+	method (name:'datagrid', params:[arg1:'org.cloudifysource.dsl.DataGrid'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'memcachedProcessingUnit', params:[arg1:'org.cloudifysource.dsl.Memcached'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'mirrorProcessingUnit', params:[arg1:'org.cloudifysource.dsl.MirrorProcessingUnit'], provider:'Cloudify DSL', doc: '')
+	method (name:'customProperties', params:[arg1:'java.util.Map'], provider:'Cloudify DSL', doc: '')
+	method (name:'compute', params:[arg1:'org.cloudifysource.dsl.ComputeDetails'], provider:'Cloudify DSL', doc: '')
+	method (name:'extendedServicesPaths', params:[arg1:'java.util.LinkedList'], provider:'Cloudify DSL', doc: '')
+	method (name:'elastic', params:[arg1:'boolean'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'url', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: '')
+	method (name:'scalingRules', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+	method (name:'scaleOutCooldownInSeconds', params:[arg1:'long'], provider:'Cloudify DSL', doc: '')
+	method (name:'scaleInCooldownInSeconds', params:[arg1:'long'], provider:'Cloudify DSL', doc: '')
+	method (name:'serviceStatistics', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+	method (name:'perInstanceStatistics', params:[arg1:'java.util.List'], provider:'Cloudify DSL', doc: '')
+	method (name:'samplingPeriodInSeconds', params:[arg1:'long'], provider:'Cloudify DSL', doc: '')
+	method (name:'locationAware', params:[arg1:'boolean'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+}
+(enclosingCall(name("cloud")) & not(enclosingCall(name("template"))) & not(enclosingCall(name("provider"))) & not(enclosingCall(name("configuration"))) & not(enclosingCall(name("user")))).accept {
+	method (name:'name', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'provider', params:[arg1:'org.cloudifysource.dsl.cloud.CloudProvider'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'user', params:[arg1:'org.cloudifysource.dsl.cloud.CloudUser'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'configuration', params:[arg1:'org.cloudifysource.dsl.cloud.CloudConfiguration'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'templates', params:[arg1:'java.util.Map'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'custom', params:[arg1:'java.util.Map'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+}
+(enclosingCall(name("configuration"))).accept {
+	method (name:'className', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'nicAddress', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'lookupGroups', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'lookupLocators', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'managementMachineTemplate', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'bootstrapManagementOnPublicIp', params:[arg1:'boolean'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'connectToPrivateIp', params:[arg1:'boolean'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+}
+(enclosingCall(name("user"))).accept {
+	method (name:'user', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+	method (name:'apiKey', params:[arg1:'java.lang.String'], provider:'Cloudify DSL', doc: 'Missing Documentation')
+}
